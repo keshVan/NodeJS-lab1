@@ -41,8 +41,10 @@ function getImgName(id, callback) {
     });
 }
 
+app.use(logger(SERVICE));
+
 //Добавить юнит
-app.post("/add", logger(SERVICE), upload.single("image"), loader, (req, res) => {
+app.post("/add", upload.single("image"), loader, (req, res) => {
     const stmt = db.prepare("INSERT INTO units (name, img_name, date) VALUES (?, ?, ?)");
     stmt.run(req.body.name, req.file.originalname, new Date(Date.now() - offset).toISOString());
     stmt.finalize();
@@ -51,37 +53,48 @@ app.post("/add", logger(SERVICE), upload.single("image"), loader, (req, res) => 
 });
 
 //Получить все юниты
-app.get("/units", logger(SERVICE), (req, res) => {
+app.get("/units", (req, res) => {
     db.all("SELECT * FROM units", (err, rows) => {
         res.json(rows);
     });
 });
 
 //Получить юнит по id
-app.get("/unit/:id", logger(SERVICE), (req, res) => {
+app.get("/unit/:id", (req, res) => {
     db.get("SELECT * FROM units WHERE id = ?", [req.params.id], (err, row) => {
         if (err) {
+            res.status(500).send("Ошибка БД");
+            return;
+        }
+        else if (!row) {
             res.status(404).send("Такой unit не существует.");
             return;
         }
-        res.json(row);
+        else {
+            res.json(row);
+        }
     });
 });
 
 //Обновить юнит по id
-app.put("/unit/:id", logger(SERVICE), upload.single("image"), loader, (req, res) => {
+app.put("/unit/:id", upload.single("image"), loader, (req, res) => {
     getImgName(req.params.id, (err, img_name) => {
         if (err) {
-            res.status(404).send("Такой unit не существует.");
+            res.status(500).send("Ошибка БД");
             return;
         }
-        axios.delete(FS_SERVICE + "/" + img_name).then( (response) => {
-            if (response.status == 404) {
-                res.send(response.data);
+        else {
+            axios.delete(FS_SERVICE + "/" + img_name).catch( (err) => {
+                if (err.response) {
+                    res.status(err.response.status).send(err.response.data);
+                }
+                else {
+                    res.status(500).send("Ошибка FS");
+                }
                 return;
-            }
-        });
-    })
+            });
+        }
+    });
 
     const stmt = "UPDATE units SET name = ?, img_name = ?, date = ? WHERE id = ?";
     db.run(stmt, [req.body.name, req.file.originalname, new Date(Date.now() - offset).toISOString(), req.params.id], (err) => {
@@ -89,13 +102,14 @@ app.put("/unit/:id", logger(SERVICE), upload.single("image"), loader, (req, res)
             res.status(404).send("Такой unit не существует.");
             return;
         }
+        else {
+            res.send(req.body.name + "успешно обновлен.");
+        }
     });
-
-    res.send(req.body.name + "успешно обновлен.");
 });
 
 //Удалить юнит по id
-app.delete("/unit/:id", logger(SERVICE), (req, res) => {
+app.delete("/unit/:id", (req, res) => {
     getImgName(req.params.id, (err, img_name) => {
         if (err) {
             res.status(404).send("Такой unit не существует.");
@@ -111,11 +125,14 @@ app.delete("/unit/:id", logger(SERVICE), (req, res) => {
 
     const stmt = `DELETE FROM units WHERE id = ${req.params.id}`;
     db.run(stmt, (err) => {
-        res.status(404).send("Такой unit не существует.");
-        return;
+        if (err) {
+            res.status(404).send("Такой unit не существует.");
+            return;
+        }
+        else {
+            res.send("unit: " + req.params.id + "успешно удален.");
+        }
     });
-
-    res.send("unit: " + req.params.id + "успешно удален.");
 });
 
 app.listen(PORT);

@@ -13,7 +13,7 @@ const UNITS = "http://localhost:3001";
 const validate = (req, res, next) => {
     const name = req.body.name;
     if (!name || name.length <= 4) {
-        res.status(400).send("Имя не дожно быть пустым и содержать более 4 символов.");
+        res.status(400).send("Имя дожно быть пустым и содержать более 4 символов.");
         return;
     }
     if (!req.file) {
@@ -24,13 +24,13 @@ const validate = (req, res, next) => {
     next();
 }
 
-router.get("/all", (req, res) => {
+router.get("/", (req, res) => {
     axios.get(UNITS + "/units").then( (response) => {
         res.send(response.data);
     });
 });
 
-router.post("/add", upload.single("image"), validate, (req, res) => {
+router.post("/", upload.single("image"), validate, (req, res) => {
     const formData = new FormData();
     formData.append("image", req.file.buffer, {
         filename: req.file.originalname,
@@ -46,13 +46,22 @@ router.post("/add", upload.single("image"), validate, (req, res) => {
     });
 });
 
-router.get("/get/:id", (req, res) => {
-    axios.get(UNITS + "/unit/" + req.params.id).then( (response) => {
+router.get("/:id", (req, res) => {
+    axios.get(UNITS + "/unit/" + req.params.id)
+    .then( (response) => {
         res.send(response.data);
+    })
+    .catch( (err) => {
+        if (err.response) {
+            res.status(err.response.status).send(err.response.data);
+        }
+        else {
+            res.status(500).send("Ошибка шлюза.");
+        }
     });
 });
 
-router.put("/update/:id", upload.single("image"), validate, (req, res) => {
+router.put("/:id", upload.single("image"), validate, (req, res) => {
     const formData = new FormData();
     formData.append("image", req.file.buffer, {
         filename: req.file.originalname,
@@ -69,7 +78,7 @@ router.put("/update/:id", upload.single("image"), validate, (req, res) => {
     });
 });
 
-router.delete("/delete/:id", (req, res) => {
+router.delete("/:id", (req, res) => {
     axios.delete(UNITS + "/unit/" + req.params.id).then( (response) => {
         res.send(response.data);
     });

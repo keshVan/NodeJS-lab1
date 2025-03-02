@@ -30,24 +30,33 @@ const validate = (req, res, next) => {
     next();
 }
 
+app.use(logger(SERVICE));
+
 //Загрузить файл
-app.post("/upload", upload.single("image"), logger(SERVICE), (req, res) => {
+app.post("/upload", upload.single("image"), (req, res) => {
     res.send(req.file.originalname + "успешно загружен.");
 });
 
 //Удалить файл
-app.delete("/:name", logger(SERVICE), validate, (req, res) => {
+app.delete("/:name", validate, (req, res) => {
     fs.unlink("uploads/" + req.params.name, (err) => {
-        res.status(500).send("Ошибка при удалении файла.");
-        return;
+        if (err) {
+            res.status(500).send("Ошибка при удалении файла.");
+            return;
+        }
+        else {
+            res.send("Файл: " + req.params.name + "успешно удален.")
+        }
     });
-    res.send("Файл: " + req.params.name + "успешно удален.")
 });
 
 
 //Получить файл
-app.get("/:name", logger(SERVICE), validate, (req, res) => {
-    res.sendFile("uploads/" + req.params.name);
+app.get("/:name", validate, (req, res) => {
+    fs.readFile("uploads/" + req.params.name, (err, data) => {
+        res.setHeader('Content-Type', 'image/jpg');
+        res.send(data);
+    });
 });
 
 app.listen(PORT);
